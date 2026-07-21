@@ -1,0 +1,5 @@
+<div id="activity" {% if active_jobs and poll < 24 %}hx-get="{% url 'activity' invoice.id %}?poll={{ next_poll }}" hx-trigger="load delay:5s" hx-swap="outerHTML"{% endif %}>{% for job in jobs %}<article class="job">
+<b>Explanation #{{ job.id }} · v{{ job.version.revision }} · {{ job.status }}</b>{% if job.result %}<p>{{ job.result.text }}</p>
+<small>{{ job.result.source }} · fact IDs {{ job.result.fact_ids|join:", " }}</small>{% endif %}<small>Usage: {% if job.usage.known %}recorded{% else %}unknown{% endif %} · guard reservation {{ job.guard_units }} (not billing)</small>{% for event in job.events.all %}<small>{{ event.id }} / {{ event.kind }} {{ event.detail }}</small>{% endfor %}{% if job.status == "queued" or job.status == "running" %}<form method="post" action="{% url 'cancel' job.id %}">{% csrf_token %}<button class="text-button">Cancel explanation</button>
+</form>{% endif %}</article>{% endfor %}
+</div>

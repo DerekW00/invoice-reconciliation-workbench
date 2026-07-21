@@ -1,0 +1,19 @@
+name: invoice-reconciliation-workbench
+services:
+  postgres:
+    image: postgres:16.15
+    environment:
+      POSTGRES_DB: invoice_recon
+      POSTGRES_USER: dw
+      POSTGRES_PASSWORD: local-invoice-demo-db
+    ports:
+      - "127.0.0.1:15532:5432"
+    volumes:
+      - invoice_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dw -d invoice_recon"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  invoice_pg:

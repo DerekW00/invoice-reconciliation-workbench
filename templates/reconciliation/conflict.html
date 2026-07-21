@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block content %}<section class="login">
+<p class="eyebrow accent">VERSION CONTROL</p>
+<h1>Review changed</h1>
+<div class="error" role="alert">{{ error }}</div>
+<p class="lede">Open the current facts and record your decision against the latest version.</p>
+<a class="button" href="{% url 'detail' invoice.id %}">Reload latest review</a>
+</section>{% endblock %}

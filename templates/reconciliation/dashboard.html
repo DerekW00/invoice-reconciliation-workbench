@@ -1,0 +1,73 @@
+{% extends "base.html" %}{% block content %}
+<section class="heading">
+<div>
+<p class="eyebrow accent">YOUR RECONCILIATION DESK</p>
+<h1>Every difference, accounted for.</h1>
+<p class="lede">Compare the order. Confirm the receipt. Review the exception.</p>
+</div>
+<span class="date-stamp">AP<br>CONTROL</span>
+</section>
+<div class="metrics">
+<div>
+<span>AWAITING REVIEW</span>
+<strong>{{ review_count|stringformat:"02d" }}</strong>
+</div>
+<div>
+<span>APPROVED LEDGERS</span>
+<strong>{{ approved_count|stringformat:"02d" }}</strong>
+</div>
+<div>
+<span>RECONCILIATION METHOD</span>
+<strong class="small">Exact identifiers</strong>
+<small>Vendor / PO / line</small>
+</div>
+</div>
+<div class="desk-grid">
+<section class="panel queue">
+<div class="panel-heading">
+<h2>Invoice register</h2>
+<span class="pill">TENANT SCOPED</span>
+</div>
+<table>
+<thead>
+<tr>
+<th>Invoice / vendor</th>
+<th>State</th>
+<th>Review</th>
+</tr>
+</thead>
+<tbody>{% for invoice in invoices %}<tr>
+<td>
+<b>{{ invoice.number }}</b>
+<small>{{ invoice.vendor }}</small>
+</td>
+<td>
+<span class="status {{ invoice.status }}">{{ invoice.status }}</span>
+</td>
+<td>
+<a href="{% url 'detail' invoice.id %}" class="arrow" aria-label="Review {{ invoice.number }}">Open →</a>
+</td>
+</tr>{% empty %}<tr>
+<td colspan="3" class="empty">Your register is ready.<br>Import purchase orders, receipts, then invoices to begin.</td>
+</tr>{% endfor %}</tbody>
+</table>
+</section>
+<section class="panel import">
+<p class="eyebrow accent">PUBLISH SOURCE RECORDS</p>
+<h2>Import a CSV</h2>
+<p class="muted">Every row is validated before the batch becomes visible. Existing keys never overwrite prior records.</p>{% if error %}<div role="alert" class="error">{{ error }}</div>{% endif %}<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<button>Validate &amp; import</button>
+</form>
+<details>
+<summary>CSV schemas &amp; limits</summary>
+<p>Exact headers, UTF-8, 256 KiB and 500 rows. Supported currencies: USD, EUR, GBP.</p>
+<code>PO: vendor,po,line,currency,quantity,unit_price</code>
+<code>Receipt: vendor,po,line,receipt,quantity</code>
+<code>Invoice: vendor,invoice,po,line,currency,quantity,unit_price</code>
+</details>
+</section>
+</div>
+<section class="batch-strip">
+<h3>Recent source batches</h3>{% for batch in batches %}<span class="batch">
+<b>{{ batch.kind|upper }}</b> {{ batch.row_count }} rows <small>#{{ batch.id }}</small>
+</span>{% empty %}<span class="muted">No imports yet.</span>{% endfor %}</section>
+{% endblock %}

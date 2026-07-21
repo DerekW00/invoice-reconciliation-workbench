@@ -1,0 +1,21 @@
+[project]
+name = "invoice-reconciliation-workbench"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["django==5.2.7", "psycopg[binary]==3.2.12", "gunicorn==23.0.0"]
+[dependency-groups]
+dev = ["pytest==8.4.2", "pytest-django==4.11.1", "ruff==0.14.2", "mypy==1.18.2", "django-stubs==5.2.7", "playwright==1.64.1"]
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+testpaths = ["tests"]
+markers = ["browser: real Chromium journey"]
+addopts = "-m 'not browser'"
+[tool.ruff]
+line-length = 100
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+ignore_missing_imports = true
+check_untyped_defs = true
+exclude = ["tests", "migrations"]
+[tool.django-stubs]
+django_settings_module = "config.settings"

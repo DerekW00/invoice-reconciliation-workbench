@@ -1,0 +1,6 @@
+vendor,invoice,po,line,currency,quantity,unit_price
+Atlas Supply,INV-204,PO-701,1,USD,8,12.75
+Atlas Supply,INV-205,PO-702,1,USD,3,50.00
+Atlas Supply,INV-206,PO-701,1,USD,8,12.75
+Atlas Supply,INV-207,PO-MISSING,1,GBP,1,90.00
+Birch Tools,INV-203,PO-700,1,GBP,2,40.00

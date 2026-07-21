@@ -1,0 +1,15 @@
+# Architecture
+
+Django 5.2 owns sessions, CSRF, server-rendered HTML and ORM persistence. Membership is resolved from the authenticated user for every protected request; organization IDs are never supplied by a browser form or explanation fixture. Every detail, review, activity, cancellation and CSV download first scopes its object to that organization. The second tenant is real persisted data.
+
+The money module validates Decimal values before multiplication. The importer fully stages bounded CSV outside its transaction. It then locks the organization, checks the canonical digest and business keys, and publishes all rows and the batch together. A late malformed row cannot leave partial records. No import can update an existing invoice number, PO line or receipt key.
+
+All financial publication follows organization → invoice lock order. An organization source revision is incremented by successful imports. Reconciliation creates immutable versions containing exact source facts, separate currency totals and structured exception rows. Resolution copies a version, records a new revision and acceptance note, and appends reviewer-attributed audit history. A later import makes an unapproved review stale. Approval rechecks revision/source facts under the same locks, rejects unresolved exceptions, increments the invoice revision and copies a frozen financial snapshot. Concurrent approvers cannot both win. Exports use only that snapshot.
+
+The organization lock serializes independent invoices conservatively. This favors clear correctness over throughput for a bounded portfolio workflow. Existing approved invoices retain their frozen version and export after new imports; they are historical decisions, not claims about current receipt state.
+
+Jobs follow organization → job lock order. A claim has a cryptographically random token, 30-second lease and two-minute deadline. Publication reads the clock after obtaining both locks. Cancellation clears the token and makes a terminal state; reclaim replaces it. Expired, cancelled, reclaimed or deadline-exceeded claims cannot publish. Events are durable and ordered by database ID. The fixture adapter runs outside locks, admits at most 100 exception facts/32 KiB, and returns at most 2,000 explanation characters with the exact input fact IDs. Only ten active jobs are admitted per organization. One guard reservation per job is an admission unit, never a billing claim. Missing usage stays explicitly unknown.
+
+The fixture worker cannot mutate financial records. No network tools, shell tools, fuzzy match, provider credentials or live-provider path exists. The browser polls only active jobs, at five-second intervals for at most 24 requests per page load. Ordinary forms and refresh remain functional without JavaScript.
+
+CSV text is escaped by prefixing a single quote when the first non-whitespace/control character is =, +, - or @; csv.writer handles cell quoting. Downloads require authentication and organization ownership, use a numeric filename, and set nosniff. HTML templates autoescape source facts and reviewer notes.

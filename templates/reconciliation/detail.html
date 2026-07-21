@@ -1,0 +1,97 @@
+{% extends "base.html" %}{% block content %}
+<a href="/" class="back">← Invoice register</a>
+<section class="heading">
+<div>
+<p class="eyebrow accent">INVOICE REVIEW / VERSION {{ version.revision }}</p>
+<h1>{{ invoice.number }}</h1>
+<p class="lede">{{ invoice.vendor }} <span class="separator">/</span> {{ org.name }}</p>
+</div>
+<div class="amount">{% for currency,total in version.snapshot.totals.items %}<span>{{ currency }}</span>
+<strong>{{ total }}</strong>{% endfor %}{% if invoice.status == "approved" %}<span class="status approved">Approved · frozen</span>{% else %}<span class="status review">Review required</span>{% endif %}</div>
+</section>
+<div class="review-grid">
+<section class="review-main">
+<section class="panel">
+<div class="panel-heading">
+<h2>Three-way reconciliation</h2>
+<span class="pill">NO FX CONVERSION</span>
+</div>
+<table class="numbers">
+<thead>
+<tr>
+<th>PO / line</th>
+<th>Ordered</th>
+<th>Received</th>
+<th>Invoiced</th>
+<th>Unit price</th>
+<th>Amount</th>
+</tr>
+</thead>
+<tbody>{% for line in version.snapshot.lines %}<tr>
+<td>
+<b>{{ line.po }}</b>
+<small>Line {{ line.line }}</small>
+</td>
+<td>{{ line.ordered|default_if_none:"Missing" }}</td>
+<td>{{ line.received }}</td>
+<td>{{ line.quantity }}</td>
+<td>{{ line.unit_price }}<small>PO {{ line.ordered_unit_price|default_if_none:"missing" }} {{ line.ordered_currency }}</small>
+</td>
+<td>
+<b>{{ line.amount }}</b>
+<small>{{ line.currency }}</small>
+</td>
+</tr>{% endfor %}</tbody>
+</table>
+</section>
+<section class="exceptions">
+<div class="section-title">
+<h2>Exception facts</h2>
+<span class="muted">{% if version.resolved %}Accepted with reviewer note{% else %}Needs a recorded decision{% endif %}</span>
+</div>{% for exception in version.exceptions.all %}<article class="exception">
+<span class="exception-icon">!</span>
+<div>
+<h3>{{ exception.code }}</h3>
+<p>Line {{ exception.line }} · fact #{{ exception.id }}</p>
+<details>
+<summary>Inspect source facts</summary>
+<dl>{% for key,value in exception.facts.items %}<dt>{{ key }}</dt>
+<dd>{{ value|default_if_none:"missing" }}</dd>{% endfor %}</dl>
+</details>
+</div>
+<span class="pill">{% if version.resolved %}ACCEPTED{% else %}OPEN{% endif %}</span>
+</article>{% empty %}<div class="notice">All source records agree. This version is ready for approval.</div>{% endfor %}</section>
+<section class="panel history">
+<h2>Decision history</h2>{% for event in invoice.audit.all %}<div class="history-row">
+<span class="history-dot">
+</span>
+<div>
+<b>{{ event.action|capfirst }}</b> <small>{% if event.actor %}{{ event.actor.username }}{% else %}system / local command{% endif %}</small>
+<p>{{ event.note|default:"Financial snapshot recorded." }}</p>
+</div>
+<small>v{{ event.revision }}<br>{{ event.created_at|date:"H:i:s" }} UTC</small>
+</div>{% endfor %}</section>
+</section>
+<aside class="review-side">
+<section class="panel decision">
+<p class="eyebrow accent">HUMAN REVIEW CONTROL</p>
+<h2>Record the decision</h2>{% if invoice.status == "approved" %}<p>The approved financial snapshot is frozen. Later imports cannot change this export.</p>
+<a class="button" href="{% url 'export' invoice.id %}">Download approved ledger</a>{% else %}<p class="muted">Accept the listed exceptions with a clear note. Amounts and source records remain immutable.</p>
+<form action="{% url 'resolve' invoice.id %}" method="post">{% csrf_token %}{{ form.as_p }}<button class="secondary">Record resolution</button>
+</form>
+<div class="approval">
+<p>Approval freezes version {{ version.revision }}. Stale attempts are rejected.</p>
+<form action="{% url 'approve' invoice.id %}" method="post">{% csrf_token %}<input type="hidden" name="revision" value="{{ version.revision }}">
+<button>Approve ledger</button>
+</form>
+</div>{% endif %}</section>
+<section class="panel explanation">
+<h2>Exception explainer</h2>
+<span class="pill">SCRIPTED FIXTURE</span>
+<p class="muted">Bounded fact references only. Explanations never set amounts or approve a ledger.</p>
+<form action="{% url 'explain' invoice.id %}" method="post">{% csrf_token %}<button class="secondary">Queue explanation</button>
+</form>{% include "reconciliation/activity.html" %}<p class="muted">Run the local worker to process queued jobs. Refresh also recovers saved activity.</p>
+</section>
+</aside>
+</div>
+{% endblock %}

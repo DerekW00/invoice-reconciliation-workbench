@@ -1,0 +1,36 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoice Reconciliation Workbench</title>
+<link rel="stylesheet" href="{% static 'app.css' %}">
+<script src="{% static 'vendor/htmx-2.0.8.min.js' %}" defer>
+</script>
+</head>
+<body>
+<aside class="rail">
+<a href="/" class="brand">
+<span class="brandmark">≋</span>
+<span>Ledger<br>
+<b>Workbench</b>
+</span>
+</a>
+<p class="eyebrow">ACCOUNTS PAYABLE</p>
+<a href="/" class="nav active">01 <span>Reconciliation desk</span>
+</a>
+<div class="rail-note">
+<span class="live-dot">
+</span> LOCAL SYNTHETIC DEMO<p>Exact amounts.<br>Explicit decisions.<br>A traceable ledger.</p>
+</div>{% if user.is_authenticated %}<div class="identity">{{ user.username }}<small>{{ org.name }}</small>
+<form action="{% url 'logout' %}" method="post">{% csrf_token %}<button class="text-button">Sign out</button>
+</form>
+</div>{% endif %}</aside>
+<main>
+<header class="topline">
+<span>FINANCE OPERATIONS / REVIEW CONTROL</span>
+<span class="mono">FIXTURE DATA · NO LIVE PAYMENTS</span>
+</header>{% block content %}{% endblock %}<footer>NEWLY SYNTHETIC RECORDS · DECIMAL / ROUND HALF UP · NO CURRENCY CONVERSION</footer>
+</main>
+</body>
+</html>
