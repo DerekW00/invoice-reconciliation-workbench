@@ -2,7 +2,7 @@
 
 The required gate is make verify; the focused real-browser gate is make browser. Both run inside the repository's own .venv via uv. PostgreSQL is required; SQLite is deliberately absent.
 
-Behavioral contracts cover ROUND_HALF_UP, non-finite/negative/overprecision values, canonical retries, duplicate/conflicting keys, malformed late rows, byte/row/header caps, missing PO, partial receipt, currency mismatch, price discrepancy, duplicate fingerprints, cumulative quantities, required notes, stale review/approval, frozen exports, real two-thread approval/resolve/import races, tenant object scoping, CSRF, formula injection including Unicode whitespace, durable fixture jobs, invalid citations, unknown usage, cancellation, reclaim, lease/deadline expiry and clock rechecking after a real lock wait.
+Behavioral contracts cover ROUND_HALF_UP, non-finite/negative/overprecision values, canonical retries, duplicate/conflicting keys, malformed late rows, byte/row/header caps, missing PO, partial receipt, currency mismatch, price discrepancy, duplicate fingerprints, cumulative quantities, required notes, stale review/approval, frozen exports, real two-thread approval/resolve/import races, tenant object scoping, CSRF, formula injection including Unicode whitespace, durable fixture jobs, invalid citations, explicit recorded missing/unknown usage, cancellation, reclaim, lease/deadline expiry and clock rechecking after a real lock wait.
 
 The Playwright Chromium journey logs in, imports all three synthetic CSV types, inspects source exceptions, records acceptance, opens a stale approval conflict, approves a refreshed version, downloads a frozen ledger and checks persistence after reload. Screenshots include the requested 1200×900 quality-70 JPEG workflow view.
 

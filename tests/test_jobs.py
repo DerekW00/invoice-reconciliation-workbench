@@ -129,3 +129,9 @@ def test_publication_rechecks_clock_after_waiting_for_lock(org, imported):
             assert entered.wait(2)
             time.sleep(0.25)
         assert future.result(timeout=5) is False
+
+
+def test_missing_provider_usage_is_explicitly_unknown():
+    result = explain([{"id": 1, "code": "price"}], "missing_usage")
+    assert result["fact_ids"] == [1]
+    assert result["usage"] == {"known": False}
