@@ -1,6 +1,6 @@
 """Real Chromium journey against Django live server and the private PostgreSQL database."""
 
-from pathlib import Path
+from tests.browser_artifacts import evidence_directory
 import pytest
 from playwright.sync_api import sync_playwright
 
@@ -8,9 +8,7 @@ from playwright.sync_api import sync_playwright
 @pytest.mark.browser
 @pytest.mark.django_db(transaction=True)
 def test_review_journey(live_server, user, org):
-    evidence = Path(
-        "/Users/dw/code/portfolio-python/python-evidence/invoice-reconciliation-workbench"
-    )
+    evidence = evidence_directory()
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         context = browser.new_context(

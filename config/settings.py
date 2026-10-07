@@ -52,3 +52,6 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
 DATA_UPLOAD_MAX_MEMORY_SIZE = 300000
+
+SESSION_COOKIE_NAME = "invoice_recon_session"
+CSRF_COOKIE_NAME = "invoice_recon_csrf"
