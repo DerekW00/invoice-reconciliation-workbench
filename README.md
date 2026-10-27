@@ -1,34 +1,79 @@
 # Invoice Reconciliation Workbench
 
-An accounts-payable review desk for exact identifier reconciliation, versioned exception decisions and frozen approved CSV ledgers. Newly authored Python/Django application with PostgreSQL persistence and a server-rendered interface. No payment is sent, and no live model or external financial service is called.
+A local accounts-payable review desk built with **Python 3.12, Django 5.2 and PostgreSQL 16**. A reviewer imports purchase orders, receipts and invoices, inspects exact-money discrepancies, records a versioned decision and downloads a frozen approved ledger.
 
-## Run a local demo
+The engineering problem is preserving a review decision while source records, browser tabs and background work can change concurrently. This portfolio project demonstrates atomic CSV staging, Decimal arithmetic, explicit matching, PostgreSQL locking, tenant boundaries and fenced background jobs in a server-rendered application.
 
-Use Python 3.12, uv and PostgreSQL 16. Each checkout has its own .venv.
+![Synthetic invoice review showing source quantities, price and delivery exceptions, and reviewer controls](docs/images/workflow-review.jpg)
 
-1. Create a PostgreSQL database named invoice_recon and a role allowed to create a test database. Set PGHOST, PGPORT, PGDATABASE, PGUSER (and PGPASSWORD if your local database requires it).
-2. Copy .env.example to .env and edit the local database settings. Export them with: set -a; . ./.env; set +a
-3. Run uv sync --frozen, then uv run python manage.py demo.
-4. Open http://127.0.0.1:8102 and sign in as reviewer / local-demo-2026. A second account, other-reviewer / local-demo-2026, owns a separate synthetic organization.
+*Real Chromium screenshot of newly synthetic records. The exception explainer uses recorded fixtures; it cannot set amounts or approve invoices.*
 
-DEMO_MODE=1 is required for account seeding. The demo command migrates, seeds idempotently, processes one explanation job and starts Django's local development server bound to 127.0.0.1:8102. Use uv run python manage.py demo --check for setup without starting the server. These are deliberately public local-demo passwords, never external account credentials.
+## Try the workflow
 
-compose.yaml documents an optional user-local PostgreSQL route: docker compose up -d postgres. It was not used for verification. Do not start it when another database already owns local port 15532. The actual verified environment uses a private source-built PostgreSQL 16.15 instance with Unix sockets, peer authentication and no TCP listener. For that environment, source /Users/dw/code/portfolio-python/execution/runtime-env.sh and export PGHOST=/Users/dw/code/portfolio-python/.runtime/pg16/invoice/socket PGPORT=15532 PGDATABASE=invoice_recon PGUSER=dw; do not set PGPASSWORD.
+1. Import the [synthetic CSV fixtures](fixtures/demo): purchase orders, receipts, then invoices. The demo command seeds these automatically.
+2. Inspect INV-204: partial delivery, a price difference and a duplicate financial fingerprint. INV-205 exposes a currency mismatch; INV-207 has no matching purchase order.
+3. Open an invoice in two tabs. Record an acceptance note in one, then attempt approval in the stale tab. Reload the current review before approving.
+4. Download the approved ledger. Later source imports cannot alter this historical snapshot. INV-203 starts with a clean approved GBP ledger.
+5. Queue a fixture explanation and process it with the worker. Activity retains exact exception fact IDs and explicit unknown provider usage.
 
-## Walk through the review
+## Local setup
 
-- INV-204 shows partial delivery, a price difference and a duplicate fingerprint. The duplicate INV-206 also makes cumulative invoiced quantity exceed the order.
-- INV-205 shows a USD invoice against a EUR purchase order. No conversion occurs.
-- INV-207 has no matching PO. Identifiers are explicit; no fuzzy matching.
-- Open the same invoice in two tabs. Record a resolution with a note in the first tab; attempt approval in the second. The old revision is rejected. Reload, approve the current version and download its frozen ledger.
-- INV-203 is a clean approved GBP ledger. Subsequent imports never mutate its approved snapshot.
-- Queue an explanation and run uv run python manage.py worker --once in another terminal. The persisted activity records claim/completion and exact exception fact IDs. The worker command without --once polls every two seconds; Ctrl-C stops it. It performs no live provider calls.
+Prerequisites: Python **3.12**, [uv](https://docs.astral.sh/uv/), a running **PostgreSQL 16** instance and PostgreSQL client commands. Run the following from the repository root. Use a dedicated local database and a local role with database-creation permission for pytest.
 
-The review interface accepts all currently listed discrepancies together, with one required reviewer note; source amounts are never editable. Resolution is acceptance of a discrepancy, not correction of the invoice or authorization to transfer funds.
+If that role does not exist, a PostgreSQL administrator can create it with `createuser --createdb --pwprompt invoice_demo` using the administrator connection settings. Choose a password for this local role. Then configure the application shell explicitly (adapt host/port/user to your own local PostgreSQL):
 
-## Import contract
+```sh
+export PGHOST=127.0.0.1
+export PGPORT=5432
+export PGDATABASE=invoice_recon
+export PGUSER=invoice_demo
+export PGPASSWORD=YOUR_LOCAL_DATABASE_PASSWORD
+export DEMO_MODE=1
+export SECRET_KEY=local-synthetic-demo-only-change-for-any-other-use
 
-UTF-8 CSV, exact ordered headers, 256 KiB and 500 data rows maximum. Quoted CSV text is supported. Empty/NUL-containing fields, malformed rows, extra/missing/duplicate headers, duplicate row keys, unsupported currencies and invalid decimals are rejected. Identifiers are case-sensitive and preserved exactly. Newlines in quoted identifiers are preserved and spreadsheet-safe on export.
+createdb "$PGDATABASE"
+uv sync --frozen
+uv run python manage.py migrate
+uv run python manage.py seed_demo
+uv run python manage.py worker --once
+uv run python manage.py runserver 127.0.0.1:8102 --noreload
+```
+
+Replace `YOUR_LOCAL_DATABASE_PASSWORD` before running. For a local role using peer or trust authentication, omit `PGPASSWORD`. If the database already exists, skip `createdb`. The explicit environment avoids the development defaults in settings. Environment files are not loaded automatically; if using [.env.example](.env.example), edit every database value for your machine and load it with `set -a; . ./.env; set +a`.
+
+Open **http://127.0.0.1:8102**. Synthetic demo accounts:
+
+| Account | Password | Organization |
+|---|---|---|
+| reviewer | local-demo-2026 | Northstar Workshop |
+| other-reviewer | local-demo-2026 | Southbank Studio |
+
+These are public, deliberately synthetic local-demo credentials. Seeding requires `DEMO_MODE=1`. The second account has a separate persisted tenant. After configuration, `uv run python manage.py demo` combines migration, idempotent seeding, one worker pass and the loopback development server; `demo --check` performs setup without starting the server.
+
+To process explanations queued from the UI, open another shell with the same environment and run:
+
+```sh
+uv run python manage.py worker --once
+# Or poll until Ctrl-C:
+uv run python manage.py worker
+```
+
+[compose.yaml](compose.yaml) is an **optional, unexecuted** PostgreSQL setup example. It publishes only local port 15532; if you use it, select `PGPORT=15532` and its documented local credentials instead of the example above. The verified environment used a private PostgreSQL instance, not Compose.
+
+## Engineering choices
+
+- **Exact financial facts:** finite, nonnegative Decimal inputs; extended amounts round once with ROUND_HALF_UP. Totals remain separate by currency.
+- **Atomic import:** validate the entire bounded file before publication; canonical retries are idempotent and conflicting keys never replace existing records.
+- **Versioned review:** an organization source revision and consistent organization → invoice lock order reject stale acceptance and approval. Approval copies a frozen financial snapshot.
+- **Server-owned authority:** Django sessions and CSRF, membership-based organization scoping on pages/actions/downloads/jobs, and spreadsheet-safe exported text.
+- **Durable fixture jobs:** random claim tokens, cancellation, lease/deadline checks after lock acquisition, bounded facts and exact citations. No live provider path or financial mutation authority.
+- **Small frontend:** authored HTML/CSS and locally licensed HTMX; ordinary forms also work without JavaScript.
+
+Read the [architecture](docs/architecture.md), [tradeoffs](docs/tradeoffs.md) and [verification notes](docs/verification.md). The organization lock deliberately favors simple correctness over unmeasured high-volume throughput.
+
+## Import and approval limits
+
+UTF-8 CSV only, exact ordered headers, **256 KiB / 500 data rows** maximum. Identifiers are case-sensitive and preserved exactly; matching uses organization/vendor/PO/line, without fuzzy matching.
 
 | Type | Exact header |
 |---|---|
@@ -36,16 +81,29 @@ UTF-8 CSV, exact ordered headers, 256 KiB and 500 data rows maximum. Quoted CSV 
 | receipt | vendor,po,line,receipt,quantity |
 | invoice | vendor,invoice,po,line,currency,quantity,unit_price |
 
-Only USD, EUR and GBP are supported. Quantities/prices are finite, nonnegative Decimals, at most four decimal places and at most 1,000,000,000. Extended line amounts round once to 0.01 using ROUND_HALF_UP; 3 × 0.335 = 1.01. Totals sum rounded line amounts separately by currency. Currency disagreement becomes an exception. There is no FX conversion or implicit mixed-currency sum.
+Only USD, EUR and GBP are supported, with no FX conversion or combined mixed-currency numeric total. Quantities and unit prices allow at most four decimal places and 1,000,000,000. For example, `3 × 0.335 = 1.01`; totals sum rounded line amounts.
 
-Canonical row ordering and decimal spelling determine the batch digest. An identical retry returns the prior batch. An existing business key under different content is rejected atomically; invoice numbers cannot be overwritten even before approval. Receipts have explicit receipt IDs and may accumulate. All invoice quantities with the same organization/vendor/PO/line are counted conservatively, including unapproved invoices. New source records increase the organization's source revision and invalidate unapproved review acceptance on the next review/approval.
+Existing invoice numbers, PO lines and receipt keys cannot be overwritten. All invoices count conservatively toward cumulative PO/receipt quantities, including unapproved duplicates. New source batches invalidate unapproved acceptance, even for unrelated invoices. A single required note accepts every listed exception in that version; this is acceptance of a discrepancy, not correction of source records or authorization to send money.
 
-## Verify
+This local demo has no payment execution, OCR, tax, credit-note workflow, arbitrary vendor formats or production hosting. Audit history is application-level, not tamper-proof against a database administrator. No customer use, business impact, production scale or live-model quality is claimed.
 
-Run make verify against a real PostgreSQL database with test-database creation permission. It checks the frozen dependency lock, Django/migration drift, Ruff lint/format, mypy, the entire default pytest suite and eight frozen functional fixture evaluations. SQLite is not supported.
+## Verification
 
-Install the pinned Playwright browser with uv run playwright install chromium (and the documented system libraries for your machine), then run make browser. In the verified VPS environment the browser/runtime already exists: source the runtime-env.sh above. Browser tests use Django's local live server and a private test database, then write screenshots and a downloaded ledger to a newly created writable temporary directory. To retain artifacts use BROWSER_EVIDENCE_DIR="$PWD/.browser-evidence" make browser (ignored locally), or choose any writable destination. Verified VPS gates explicitly supply the canonical external evidence directory; shared runtime infrastructure is unchanged.
+With the same local environment and a PostgreSQL role permitted to create a test database:
 
-See docs/architecture.md, docs/tradeoffs.md, docs/verification.md, docs/data-provenance.md and docs/contributions.md. This is a local portfolio product, with observed checks documented separately from unmeasured production behavior and live-model quality.
+```sh
+make verify
+uv run playwright install chromium
+# Install the browser system libraries appropriate to your OS if needed.
+BROWSER_EVIDENCE_DIR="$PWD/.browser-evidence" make browser
+```
 
-Same-host demo cookies use `invoice_recon_session` and `invoice_recon_csrf`, so the three loopback products can retain separate sessions and CSRF forms across ports. Cookie domain/path and CSRF enforcement retain their normal Django scope.
+`make verify` checks the dependency lock, frozen sync, Django configuration, migration drift, Ruff lint/format, mypy, real PostgreSQL tests and fixture evaluations. The browser gate is separate and requires port **8102** to be free: stop the demo server first. Browser artifacts default to a writable temporary directory; `BROWSER_EVIDENCE_DIR` retains screenshots and the downloaded ledger at a chosen destination. `.browser-evidence` is ignored.
+
+At tested code commit **`7cc51c2d0cff74abbd091df3efbc1aa36fc14a6a`**, recorded gates passed **66 non-browser tests, 1 Chromium journey and 8 scripted fixture evaluations**. PostgreSQL contention cases observe actual lock waits for competing review/import/approval operations. The browser covers login, three CSV imports, discrepancies, acceptance, stale approval, fresh approval, download and reload. These are functional checks, not measured live-model accuracy, latency or spend. The screenshot above comes from that verification run; private machine-specific logs are not required to run the project.
+
+## Authorship and license
+
+Created with AI coding assistance. [Contribution notes](docs/contributions.md) describe human direction and AI-authored implementation; [data provenance](docs/data-provenance.md) documents newly synthetic fixtures and third-party assets. No employer code, private data or customer records are included.
+
+Original project code and documentation are available under the [MIT License](LICENSE), copyright 2026 Derek Derui Wang. Vendored HTMX retains its [Zero-Clause BSD license](static/vendor/HTMX-LICENSE); upstream dependencies retain their own licenses. See [CONTRIBUTING.md](CONTRIBUTING.md) for local contribution guidance.
